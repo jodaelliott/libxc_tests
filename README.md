@@ -16,3 +16,5 @@ The step <code>autoreconf -i</code> generates the autotools configure script.
     make
     make check
     make install
+
+<b>Note</b>: I have opted for the <code>icpc</code> compiler due to an error in installation with <code>icc</code>. This was suggested here: https://gitlab.com/libxc/libxc/-/issues/301 
