@@ -11,10 +11,13 @@ Attemps to understand how to use libxc with FORTRAN
     
 The step <code>autoreconf -i</code> generates the autotools configure script.
 
-    export CC=icpc
-    ./configure --prefix='/scratch/Applications/libxc/install-libxc-6.0.0_intel-2022'
+    export CC=gfortran
+    export LD_LIBXC=/scratch/Applications/libxc/libxc/GCC
+    ./configure --prefix=${LD_LIBXC}
     make
     make check
     make install
 
-<b>Note</b>: I have opted for the <code>icpc</code> compiler due to an error in installation with <code>icc</code>. This was suggested here: https://gitlab.com/libxc/libxc/-/issues/301 
+Code can be compiled, linking the library (as per https://stackoverflow.com/questions/74800483/undefined-reference-when-trying-to-link-libxc-to-fortran)
+
+    gfortran -o example_basic.x example_basic.f90 -I${LD_LIBXC}/include -L${LD_LIBXC}/lib/ -lxcf90 -lxc 
