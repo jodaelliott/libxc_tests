@@ -2,7 +2,7 @@
 Attemps to understand how to use libxc with FORTRAN
 
 
-## Compilation of <code>libxc-6.0.0</code> with intel/2022
+## Compilation of <code>libxc-6.0.0</code>
 
     wget https://gitlab.com/libxc/libxc/-/archive/6.0.0/libxc-6.0.0.tar.gz
     tar -zxvf libxc-6.0.0.tar.gz
