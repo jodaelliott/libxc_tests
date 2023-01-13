@@ -7,7 +7,7 @@ PROGRAM example_basicF90
    USE lsda_mod,      ONLY : nspin
    USE mp_global,     ONLY : mp_startup
    USE fft_base,      ONLY : dfftp ! This is so we can allocate evc the same size as rho
-   USE scf,           ONLY : rho
+   USE scf,           ONLY : rho, rho_core, rhog_core
    USE cell_base,     ONLY : omega
    USE gvect,         ONLY : g, ngm
    ! From libxc
@@ -21,7 +21,9 @@ PROGRAM example_basicF90
                             xc_f90_func_init,                      &
                             xc_f90_func_end,                       &
                             xc_f90_lda_exc,                        &
+                            xc_f90_lda_vxc,                        &
                             xc_f90_gga_exc,                        &
+                            xc_f90_gga_vxc,                        &
                             XC_UNPOLARIZED,                        &
                             XC_LDA_X,                              &
                             XC_LDA_C_PZ,                           &
@@ -42,9 +44,10 @@ PROGRAM example_basicF90
 
    REAL(8) :: exc(5)
 
-   REAL(8), ALLOCATABLE :: ex(:,:), ec(:,:), sigma(:)
+   REAL(8), ALLOCATABLE :: ex(:,:), ec(:,:), sigma(:), vxc(:,:)
+   REAL(8), ALLOCATABLE :: vrho_x(:,:), vrho_c(:,:), vsigma_x(:,:), vsigma_c(:,:)
 
-   REAL(8) :: etx, etc ! The total exchange energy
+   REAL(8) :: etx, etc, etxc, vtxc ! The total exchange energy
 
    COMPLEX(8), ALLOCATABLE :: rhogsum(:)
    REAL(8), ALLOCATABLE :: grho(:,:,:)
@@ -68,12 +71,18 @@ PROGRAM example_basicF90
    WRITE(rho_file, '(a)') TRIM(restart_dir()) // 'charge-density.dat'
    ! Next we have to get rho from the completed simulation
    CALL read_scf( rho, nspin, gamma_only)
+   CALL set_rhoc()
 
    ! Allocate the exchange-correlation energy arrray the same way as rho
    ! in scf_mod.f90
    nnr = dfftp%nnr
    ALLOCATE(ex(dfftp%nnr, nspin))
    ALLOCATE(ec(dfftp%nnr, nspin))
+   ALLOCATE(vrho_x(dfftp%nnr, nspin))
+   ALLOCATE(vrho_c(dfftp%nnr, nspin))
+   ALLOCATE(vsigma_x(dfftp%nnr, nspin))
+   ALLOCATE(vsigma_c(dfftp%nnr, nspin))
+   ALLOCATE(vxc(dfftp%nnr, nspin))
 
    ! First we call the function to print the version of 
    ! libxc we are using and write the output to terminal
@@ -154,7 +163,8 @@ PROGRAM example_basicF90
       CALL fft_gradient_g2r(dfftp, rhogsum, g, grho)
 
       DO i = 1, dfftp%nnr
-         sigma(i) = grho(1,i,1)*grho(1,i,1)
+         !sigma(i) = grho(1,i,1)*grho(1,i,1)
+         sigma(i) = grho(1,i,1)**2 + grho(2,i,1)**2 + grho(3,i,1)**2
       END DO
 
       DEALLOCATE(rhogsum)
@@ -172,6 +182,7 @@ PROGRAM example_basicF90
          CALL xc_f90_lda_exc(xc_func_x, nnr, rho%of_r(1,1), ex(1,1))
       CASE (XC_FAMILY_GGA)
          CALL xc_f90_gga_exc(xc_func_x, nnr, rho%of_r(1,1), sigma(1), ex(1,1))
+         CALL xc_f90_gga_vxc(xc_func_x, nnr, rho%of_r(1,1), sigma(1), vrho_x(1,1), vsigma_x(1,1))
    END SELECT
 
    etx = 0.
@@ -199,6 +210,7 @@ PROGRAM example_basicF90
          CALL xc_f90_lda_exc(xc_func_c, nnr, rho%of_r(1,1), ec(1,1))
       CASE (XC_FAMILY_GGA)
          CALL xc_f90_gga_exc(xc_func_c, nnr, rho%of_r(1,1), sigma(1),  ec(1,1))
+         CALL xc_f90_gga_vxc(xc_func_c, nnr, rho%of_r(1,1), sigma(1),  vrho_c(1,1), vsigma_c(1,1))
    END SELECT
 
    etc = 0.
@@ -213,9 +225,30 @@ PROGRAM example_basicF90
 
    WRITE(*,104) omega * etc/nnr
 
+   !---------------------------------------------
+   ! Combine exchange and correlation parts and
+   ! apply any gradient corrections
+   !---------------------------------------------
+   
+   vtxc = 0.
+   etxc = 0.
+   DO i = 1, dfftp%nnr
+      vxc(i,1) = 2. * (vrho_x(i,1) + vrho_c(i,1))
+      vtxc = vtxc + vxc(i,1)*rho%of_r(i,1)
+   END DO   
+
+   etxc = omega * (etc+etx)/nnr
+   vtxc = omega * vtxc/nnr
+
+!   etxc = 0.
+!   WRITE(*,105) etxc
+!   CALL gradcorr( rho%of_r, rho%of_g, rho_core, rhog_core, etxc, vtxc, vxc )   
+
+   WRITE(*,105) etxc
+
    CALL xc_f90_func_end(xc_func_c)
 
-   DEALLOCATE(ex, ec)
+   DEALLOCATE(ex, ec, vrho_x, vrho_c, vsigma_x, vsigma_c, vxc)
 
    CALL stop_run(0)
    CALL do_stop(0)
@@ -225,4 +258,6 @@ PROGRAM example_basicF90
 102 FORMAT(2F16.7)
 103 FORMAT("Integral of exchange energies   : ",F16.8)
 104 FORMAT("Integral of correlation energies: ",F16.8)
+105 FORMAT("Exchange correlation energy     : ",F16.8)
+
 END PROGRAM
