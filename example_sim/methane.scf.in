@@ -1,5 +1,5 @@
 &control
-    calculation = 'scf',
+    calculation = 'nscf',
     restart_mode='from_scratch',
     prefix='ch4',
     outdir='./TMP'
@@ -16,7 +16,7 @@
     ecutwfc =40.0,
     nbnd=5
 !    input_dft = 'XC-000L-000L-101L-130L'
-    input_dft = 'PBE'
+    input_dft = 'PBE0'
  /
  &electrons
     diagonalization='cg'
@@ -26,6 +26,7 @@
 ATOMIC_SPECIES
  H  1.0   H.pz-vbc.UPF
  C  12.0  C.pz-vbc.UPF
+
 ATOMIC_POSITIONS {bohr}
 H        1.198204546   1.198204546   1.198204546
 H       -1.198204546  -1.198204546   1.198204546
